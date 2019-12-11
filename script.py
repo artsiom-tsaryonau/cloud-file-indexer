@@ -1,2 +1,5 @@
 
-print('Hello World!')
+from mega import Mega
+
+mega = Mega()
+print(mega is None)
