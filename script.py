@@ -1,5 +1,6 @@
 import pickle
 import os.path
+import itertools
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
 
@@ -29,26 +30,42 @@ class GDriveClientWrapper:
             .get('files', [])
         return results[0]["id"]   
     
-    # implement recursive search
-    def list_files(self, folder=None):
+    # TODO: implement recursive search
+    def __list_files(self, folder, types=None):
         folder_id = self.__find_folder_id(folder)
+        
+        # ugly
+        if types is None:
+            query="parents in '" + folder_id + "'"
+        else:
+            types_str = ' or '.join(["mimeType='" + type + "'" for type in types])
+            query=types_str + " and parents in '" + folder_id + "'"
+        
         files = []
         page_token = None
         while True:
             response = self.client \
                 .files() \
-                .list(
-                    q="parents in '" + folder_id + "'", 
-                    spaces='drive', 
-                    fields='nextPageToken, files(id, name)',
+                .list(q=query, spaces='drive', 
+                    fields='nextPageToken, files(id, name, mimeType)',
                     pageToken=page_token) \
                 .execute();
-            files += [file['name'] for file in response.get('files', [])]
+            files += response.get('files', [])
             page_token = response.get('nextPageToken', None)
             if page_token is None:
                 break
         return files
-                
+        
+    def list_filenames(self, folder, types):
+        return [file['name'] for file in self.__list_files(folder, types)]
+        
+    def folder_stats(self, folder):
+        files = self.__list_files(folder)
+        for key, group in itertools.groupby(sorted(files, key=lambda item: item['mimeType']), lambda file: file["mimeType"]):
+            print("type: {} ; number of items: {}".format(key, len(list(group))))
+              
 google_drive_client = __create_client('gdrive 1')
-items = google_drive_client.list_files('books')
+items = google_drive_client.list_filenames('books', ['application/x-rar', 'application/rar'])
 print('Number of books: {}'.format(len(items)))
+
+google_drive_client.folder_stats('books')
