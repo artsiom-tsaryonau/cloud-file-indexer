@@ -1,38 +1,33 @@
+import pickle
+import os.path
+from googleapiclient.discovery import build
+from google.oauth2 import service_account
 
-from mega import Mega
+SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
+SERVICE_ACCOUNT_FILE = 'gcredentials.json'
 
-mega = Mega().login('sebastrident@gmail.com', 'Star treksg-11992')
-details = mega.get_user()
-print(mega.find('build tools'))
-
-# two main pipelines
-'''
-    1. cloud pipeline
-        - connect to cloud storage
-        - list files from the book folder
-    
-    2. normalization pipeline
-        - get book archive file name
-        - remove extension
-        - split by first '-'
-        - create a tuple in format: [publisher;title;subtitle;cloud]
-    
-    3. export as CSV
-'''
-
-
-'''
-    # mega.nz
-    cloud_pipeline = MegaPipeline(login, password)
-    list = cloud_pipeline.list_files('books', recursively=True)
-    
-    # google drive
-    cloud_pipeline = GoogleDrivePipeline(credentials.file)
-    list = cloud_pipeline.list_files('books', recursively=True)
-    
-    normalized_list = NormalizerPipeline().normalize(list)
-    assign_tag(list, 'gdrive | mega')
-    
-    export_to_csv(list)
-    export_to_csv(list)
-'''
+def __create_client(type):
+    if type == 'gdrive':
+        return GDriveClientWrapper(SERVICE_ACCOUNT_FILE)
+    elif type == 'mega':
+        pass
+        
+class GDriveClientWrapper:
+    def __init__(self, credentials_file):
+        self.creds = service_account.Credentials.from_service_account_file(
+            SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+        self.client = build('drive', 'v3', credentials=self.creds)
+        
+    def list_files(self, folder, recursive=False):
+        return self.client.files().list(q = "mimeType='application/vnd.google-apps.folder' and name='books'", 
+                  spaces='drive',
+                  fields='nextPageToken, files(id, name)').execute().get('files', [])
+                
+google_drive_client = __create_client('gdrive')
+items = google_drive_client.list_files('')
+if not items:
+    print('No files found.')
+else:
+    print('Files:')
+    for item in items:
+        print(u'{0} ({1})'.format(item['name'], item['id']))
