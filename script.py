@@ -1,5 +1,4 @@
-import pickle
-import os.path
+import os
 import itertools
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
@@ -64,8 +63,29 @@ class GDriveClientWrapper:
         for key, group in itertools.groupby(sorted(files, key=lambda item: item['mimeType']), lambda file: file["mimeType"]):
             print("type: {} ; number of items: {}".format(key, len(list(group))))
               
+              
+class FileNameNormalizerChain:
+    def normalize(self, filename, tag):
+        filename = self.__drop_extension(filename)
+        split = self.__split_titles(filename)
+        return self.__taggify(split, tag)
+        
+    def __taggify(self, filename_tuple, tag):
+        return filename_tuple + (tag,)
+        
+    def __drop_extension(self, filename):
+        return os.path.splitext(filename)[0]
+        
+    def __split_titles(self, filename):
+        index = filename.index('-')
+        return (filename[:index].rstrip(), filename[index+1:].lstrip())
+
+# download from google drive
 google_drive_client = __create_client('gdrive 1')
 items = google_drive_client.list_filenames('books', ['application/x-rar', 'application/rar'])
-print('Number of books: {}'.format(len(items)))
 
-google_drive_client.folder_stats('books')
+# normalize
+normalizer = FileNameNormalizerChain()
+items = [normalizer.normalize(filename, 'gdrive') for filename in items]
+print(items)
+
