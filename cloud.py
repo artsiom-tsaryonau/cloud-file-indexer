@@ -10,7 +10,7 @@ class CloudClientFactory:
             return GDriveClientWrapper(constructor_args[0])
         elif type == 'mega':
             pass
-        
+
 class GDriveClientWrapper:
     def __init__(self, credentials_file):
         self.creds = service_account.Credentials.from_service_account_file(
@@ -19,21 +19,9 @@ class GDriveClientWrapper:
 
     # returns list as there might be multiple folders with the same name
     def __find_folder_ids(self, folder):
-        results = []
-        page_token = None
-        while True:
-            response = self.client \
-                .files() \
-                .list(
-                    q="mimeType='application/vnd.google-apps.folder' and name='" + folder + "'",
-                    spaces='drive',
-                    fields='nextPageToken, files(id, name)',
-                    pageToken=page_token) \
-                .execute()
-            results += response.get('files', [])
-            page_token = response.get('nextPageToken', None)
-            if page_token is None:
-                break
+        results = self.__do_search(
+            "mimeType='application/vnd.google-apps.folder' and name='" + folder + "'", 
+            'nextPageToken, files(id, name)') 
         return [result["id"] for result in results]
     
     # TODO: implement recursive search
@@ -47,21 +35,23 @@ class GDriveClientWrapper:
             else:
                 types_str = ' or '.join(["mimeType='" + type + "'" for type in types])
                 query=types_str + " and parents in '" + folder_id + "'"
-            
-            page_token = None
-            while True:
-                response = self.client \
-                    .files() \
-                    .list(q=query, spaces='drive', 
-                        fields='nextPageToken, files(id, name, mimeType)',
-                        pageToken=page_token) \
-                    .execute();
-                all_files += response.get('files', [])
-                page_token = response.get('nextPageToken', None)
-                if page_token is None:
-                    break
+            all_files += self.__do_search(query, 'nextPageToken, files(id, name, mimeType)')
         return all_files
         
+    def __do_search(self, query, fields):
+        results = []
+        page_token = None
+        while True:
+            response = self.client \
+                .files() \
+                .list(q=query, spaces='drive', fields=fields, pageToken=page_token) \
+                .execute()
+            results += response.get('files', [])
+            page_token = response.get('nextPageToken', None)
+            if page_token is None:
+                break
+        return results
+
     def list_files(self, folder, types):
         return [file['name'] for file in self.__list_files(folder, types)]
         
