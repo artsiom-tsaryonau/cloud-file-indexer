@@ -31,6 +31,9 @@ items = google_drive_client.list_files('books', ['application/x-rar', 'applicati
 normalizer = FileNameNormalizerChain()
 items = [normalizer.normalize(filename, 'gdrive') for filename in items]
 
+print(google_drive_client.folder_stats('books'))
+print(len(items))
+
 with open('books.csv', mode='w') as csv_books:
     csv_writer = csv.writer(csv_books, delimiter=',', quoting=csv.QUOTE_ALL)
     for file_row in sorted(items, key=lambda tuple: tuple[0]):
